@@ -1,0 +1,8 @@
+{
+  "name": "公司安全管理系统",
+  "description": "一个全方位的工业安全管理平台，涵盖隐患上报、违章记录、安全规章制度库及实时通知功能，助力企业实现闭环安全生产管理。",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
