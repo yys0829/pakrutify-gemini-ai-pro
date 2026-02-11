@@ -11,9 +11,9 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react()],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
+  'process.env.SF_API_KEY': JSON.stringify(env.SF_API_KEY),
+  'process.env.SF_MODEL': JSON.stringify('Pro/zai-org/GLM-4.7')
+},
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
