@@ -62,21 +62,21 @@ const HazardReport: React.FC<HazardReportProps> = ({ onBack }) => {
     setLoading(true);
 
     try {
-      const response = await client.chat.completions.create({
-        model: "Pro/zai-org/GLM-4.7", // 你指定的模型
-        messages: [
-          { 
-            role: "system", 
-            content: "你是一个专业的矿山安全专家。请根据用户提供的隐患描述，撰写一份正式、严谨的《安全隐患整改通知书》。内容需包含：隐患现状分析、可能导致的风险、整改具体建议。语言要专业且符合中国矿业安全规范。" 
-          },
-          { 
-            role: "user", 
-            content: `隐患级别：${level}\n责任单位：${unit}\n隐患描述：${description}\n地点：${location}` 
-          }
-        ],
-        temperature: 0.7,
-      });
-
+      // --- 修改后的核心调用逻辑 ---
+const response = await client.chat.completions.create({
+  model: "Qwen/Qwen2.5-7B-Instruct", // 确保这里是你想要的通义千问模型
+  messages: [
+    { 
+      role: "system", 
+      content: "你是一个专业的矿山安全专家..." 
+    },
+    { 
+      role: "user", 
+      content: `隐患级别：${level}\n责任单位：${unit}\n隐患描述：${description}\n地点：${location}` 
+    }
+  ],
+  temperature: 0.7,
+});
       const result = response.choices[0].message.content;
       setGeneratedContent(result);
       setShowResultModal(true);
