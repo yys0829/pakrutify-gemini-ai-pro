@@ -61,8 +61,18 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
     setLoading(true);
 
     try {
+      // --- 核心修改：使用硅基流动生成违章处理建议 ---
+  const handleGenerate = async () => {
+    if (!description || !violator) {
+      alert('请填写必要信息（违章人员和行为描述）');
+      return;
+    }
+    setLoading(true);
+
+    try {
       const response = await client.chat.completions.create({
-        model: "Pro/zai-org/GLM-4.7",
+        // 关键修改点：优先读取环境变量中的 Qwen2.5 模型，如果没有则使用默认字符串
+        model: process.env.SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
         messages: [
           { 
             role: "system", 
@@ -75,6 +85,17 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
         ],
         temperature: 0.7,
       });
+
+      const result = response.choices[0].message.content;
+      setGeneratedContent(result);
+      setShowResultModal(true);
+    } catch (error: any) {
+      console.error("AI生成失败:", error);
+      alert(`AI生成失败: ${error.message || '请检查API Key配置'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
       const result = response.choices[0].message.content;
       setGeneratedContent(result);
