@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
   'process.env.SF_API_KEY': JSON.stringify(env.SF_API_KEY),
-  'process.env.SF_MODEL': JSON.stringify('Pro/zai-org/GLM-4.7')
+  'process.env.SF_MODEL': JSON.stringify('Qwen/Qwen2.5-7B-Instruct') // 这里改回通义千问
 },
       resolve: {
         alias: {
