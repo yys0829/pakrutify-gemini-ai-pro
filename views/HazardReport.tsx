@@ -1,7 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { generateReport } from '../services/geminiService';
+import OpenAI from 'openai'; // 切换到 OpenAI 库
 import { getNextSerialNumber, savePendingItem } from '../services/reportService';
+
+// 初始化硅基流动客户端
+const client = new OpenAI({
+  apiKey: process.env.SF_API_KEY || '', // 对应你在 Vercel 设置的环境变量
+  baseURL: "https://api.siliconflow.cn/v1",
+  dangerouslyAllowBrowser: true 
+});
 
 interface HazardReportProps {
   onBack: () => void;
@@ -46,16 +53,39 @@ const HazardReport: React.FC<HazardReportProps> = ({ onBack }) => {
     setImages(prev => prev.filter((_, i) => i !== index));
   };
 
+  // --- 核心修改：使用硅基流动生成报告 ---
   const handleGenerate = async () => {
     if (!description || !unit) {
       alert('请填写必要信息（责任单位和隐患描述）');
       return;
     }
     setLoading(true);
-    const result = await generateReport('hazard', { level, description, unit, location, photoCount: images.length, deadline, responsiblePerson });
-    setGeneratedContent(result);
-    setShowResultModal(true);
-    setLoading(false);
+
+    try {
+      const response = await client.chat.completions.create({
+        model: "Pro/zai-org/GLM-4.7", // 你指定的模型
+        messages: [
+          { 
+            role: "system", 
+            content: "你是一个专业的矿山安全专家。请根据用户提供的隐患描述，撰写一份正式、严谨的《安全隐患整改通知书》。内容需包含：隐患现状分析、可能导致的风险、整改具体建议。语言要专业且符合中国矿业安全规范。" 
+          },
+          { 
+            role: "user", 
+            content: `隐患级别：${level}\n责任单位：${unit}\n隐患描述：${description}\n地点：${location}` 
+          }
+        ],
+        temperature: 0.7,
+      });
+
+      const result = response.choices[0].message.content;
+      setGeneratedContent(result);
+      setShowResultModal(true);
+    } catch (error: any) {
+      console.error("AI生成失败:", error);
+      alert(`AI生成失败: ${error.message || '请检查API Key配置'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFinalSubmit = () => {
@@ -287,7 +317,7 @@ const HazardReport: React.FC<HazardReportProps> = ({ onBack }) => {
               onClick={() => setShowPhotoSource(false)}
               className="w-full h-14 text-sm font-bold text-gray-400 uppercase tracking-widest pt-2"
              >
-               取消操作
+                取消操作
              </button>
           </div>
         </div>
