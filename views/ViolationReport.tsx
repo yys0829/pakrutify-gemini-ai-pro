@@ -4,10 +4,10 @@ import OpenAI from 'openai';
 
 const client = new OpenAI({
   // 注意：这里必须使用 import.meta.env 并且加上 VITE_ 前缀
-  apiKey: "sk-pkclwfqlercrgslajypqyazqemcgtwareqcgihnjdzyvrhju", 
-  baseURL: "https://api.siliconflow.cn/v1",
-  dangerouslyAllowBrowser: true 
-});
+  // apiKey: "sk-pkclwfqlercrgslajypqyazqemcgtwareqcgihnjdzyvrhju", 
+  // baseURL: "https://api.siliconflow.cn/v1",
+  // dangerouslyAllowBrowser: true 
+  // });
 
 interface ViolationReportProps {
   onBack: () => void;
