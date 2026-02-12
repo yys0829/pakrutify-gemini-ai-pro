@@ -4,8 +4,9 @@ import OpenAI from 'openai'; // 切换到 OpenAI 库
 import { getNextSerialNumber, savePendingItem } from '../services/reportService';
 
 // 初始化硅基流动客户端
+// --- 修改後的初始化代碼 ---
 const client = new OpenAI({
-  apiKey: process.env.SF_API_KEY || '', // 对应你在 Vercel 设置的环境变量
+  apiKey: "sk-pkclwfqlercrgslajypqyazqemcgtwareqcgihnjdzyvrhju", 
   baseURL: "https://api.siliconflow.cn/v1",
   dangerouslyAllowBrowser: true 
 });
