@@ -59,9 +59,14 @@ const handleGenerate = async () => {
   }
   setLoading(true);
 
+  // --- 把这一行加在这里 ---
+  console.log("正在使用的 Key:", import.meta.env.VITE_SF_API_KEY?.substring(0, 5) + "...");
+  // -----------------------
+
   try {
     const response = await client.chat.completions.create({
       model: import.meta.env.VITE_SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
+      // ... 后面代码保持不变 
       messages: [
         { 
           role: "system", 
