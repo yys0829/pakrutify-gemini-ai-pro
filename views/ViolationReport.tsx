@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import OpenAI from 'openai'; // 切换到 OpenAI 库
-import { getNextSerialNumber, savePendingItem } from '../services/reportService';
+import OpenAI from 'openai';
 
-// 初始化硅基流动客户端
 const client = new OpenAI({
-  apiKey: process.env.SF_API_KEY || '',
+  // 注意：这里必须使用 import.meta.env 并且加上 VITE_ 前缀
+  apiKey: import.meta.env.VITE_SF_API_KEY || '', 
   baseURL: "https://api.siliconflow.cn/v1",
   dangerouslyAllowBrowser: true 
 });
