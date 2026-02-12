@@ -65,7 +65,7 @@ const handleGenerate = async () => {
 
   try {
     const response = await client.chat.completions.create({
-      model: import.meta.env.VITE_SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
+      model: "internlm/internlm2_5-7b-chat", 
       // ... 后面代码保持不变
       messages: [
         { 
