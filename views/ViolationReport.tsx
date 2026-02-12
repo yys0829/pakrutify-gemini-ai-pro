@@ -61,17 +61,8 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
     setLoading(true);
 
     try {
-      // --- 核心修改：使用硅基流动生成违章处理建议 ---
-  const handleGenerate = async () => {
-    if (!description || !violator) {
-      alert('请填写必要信息（违章人员和行为描述）');
-      return;
-    }
-    setLoading(true);
-
-    try {
       const response = await client.chat.completions.create({
-        // 关键修改点：优先读取环境变量中的 Qwen2.5 模型，如果没有则使用默认字符串
+        // 优先读取环境变量模型名
         model: process.env.SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
         messages: [
           { 
@@ -85,17 +76,6 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
         ],
         temperature: 0.7,
       });
-
-      const result = response.choices[0].message.content;
-      setGeneratedContent(result);
-      setShowResultModal(true);
-    } catch (error: any) {
-      console.error("AI生成失败:", error);
-      alert(`AI生成失败: ${error.message || '请检查API Key配置'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
       const result = response.choices[0].message.content;
       setGeneratedContent(result);
@@ -247,7 +227,6 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
         </button>
       </footer>
 
-      {/* Result Modal - 复用了 HazardReport 的样式 */}
       {showResultModal && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-[480px] rounded-t-[2.5rem] shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-500">
@@ -276,7 +255,6 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Photo Source Selector */}
       {showPhotoSource && (
         <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-end justify-center" onClick={() => setShowPhotoSource(false)}>
           <div className="bg-white w-full max-w-[480px] rounded-t-3xl p-6 pb-10 space-y-4" onClick={e => e.stopPropagation()}>
