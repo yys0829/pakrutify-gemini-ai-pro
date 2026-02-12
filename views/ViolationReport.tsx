@@ -60,21 +60,22 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
     setLoading(true);
 
     try {
-      const response = await client.chat.completions.create({
-        // 优先读取环境变量模型名
-        import.meta.env.VITE_SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
-        messages: [
-          { 
-            role: "system", 
-            content: "你是一个矿山安全监察官员。请根据用户提供的违章行为描述，撰写一份正式的《违章行为处理建议书》。内容需包含：违章性质认定（依据矿山安全规程）、潜在安全威胁、建议处理意见（如警告、罚款、停工培训等）。语言要威严、公正。" 
-          },
-          { 
-            role: "user", 
-            content: `违章类型：${type}\n违章人员：${violator}\n所属单位：${unit}\n行为描述：${description}\n地点：${location}` 
-          }
-        ],
-        temperature: 0.7,
-      });
+      // --- 请确保这部分代码完全替换 ---
+const response = await client.chat.completions.create({
+  // 确保 import.meta.env 写法正确，且引号闭合
+  model: import.meta.env.VITE_SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
+  messages: [
+    { 
+      role: "system", 
+      content: "你是一个矿山安全监察官员。请根据用户提供的违章行为描述，撰写一份正式的《违章行为处理建议书》。内容需包含：违章性质认定（依据矿山安全规程）、潜在安全威胁、建议处理意见（如警告、罚款、停工培训等）。语言要威严、公正。" 
+    },
+    { 
+      role: "user", 
+      content: `违章类型：${type}\n违章人员：${violator}\n所属单位：${unit}\n行为描述：${description}\n地点：${location}` 
+    }
+  ],
+  temperature: 0.7,
+});
 
       const result = response.choices[0].message.content;
       setGeneratedContent(result);
