@@ -62,7 +62,7 @@ const ViolationReport: React.FC<ViolationReportProps> = ({ onBack }) => {
     try {
       const response = await client.chat.completions.create({
         // 优先读取环境变量模型名
-        model: process.env.SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
+        import.meta.env.VITE_SF_MODEL || "Qwen/Qwen2.5-7B-Instruct", 
         messages: [
           { 
             role: "system", 
