@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-  "openai": "^4.0.0", 
-  "react": "^19.2.4",
-  "react-dom": "^19.2.4",
-  "lucide-react": "^0.454.0"
+    "@supabase/supabase-js": "^2.39.0"，
+    "openai": "^4.0.0", 
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "lucide-react": "^0.454.0"
 },
   "devDependencies": {
     "@types/node": "^22.14.0",
