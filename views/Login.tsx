@@ -22,12 +22,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
     setLoading(true);
     try {
+      // --- 关键修改区开始 ---
       const { error: authError } = await supabase.auth.signInWithOtp({
         email: email,
         options: {
-          emailRedirectTo: window.location.origin,
+          // 这里是精髓：window.location.origin 会自动抓取你当前的网址
+          // 确保用户点开邮件链接后，能准确跳回你现在的 Vercel 网站首页
+          emailRedirectTo: window.location.origin, 
         },
       });
+      // --- 关键修改区结束 ---
 
       if (authError) throw authError;
       setSent(true);
