@@ -1,4 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// 必须要有 export 关键字！
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+// ... 下面是你原来的其他代码
 export const getNextSerialNumber = (): string => {
   const lastIndex = localStorage.getItem('global_report_index') || '0';
   const nextIndex = parseInt(lastIndex) + 1;
