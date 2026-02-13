@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/reportService'; 
 
 interface LoginProps {
@@ -7,11 +7,12 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  // 核心逻辑：初始化时检查本地是否存有“待验证邮箱”
+  // 核心：初始化时检查本地是否存有“待验证邮箱”
   const [email, setEmail] = useState(() => localStorage.getItem('pending_email') || '');
   const [token, setToken] = useState(''); 
   const [loading, setLoading] = useState(false);
-  // 如果本地有邮箱记忆，直接进入 code 步骤
+  
+  // 如果本地有邮箱记忆，直接进入 code 步骤，否则进入 email 步骤
   const [step, setStep] = useState<'email' | 'code'>(() => 
     localStorage.getItem('pending_email') ? 'code' : 'email'
   ); 
@@ -29,7 +30,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       });
       if (authError) throw authError;
       
-      // 发送成功，存入记忆
+      // 发送成功，存入记忆，有效期由验证码自身决定（通常5-15分钟）
       localStorage.setItem('pending_email', email);
       setStep('code'); 
     } catch (err: any) {
@@ -42,6 +43,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   // 第二步：验证 6 位码
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (token.length !== 6) return;
     setLoading(true);
     setError(null);
     try {
@@ -52,7 +54,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       });
       if (verifyError) throw verifyError;
       
-      // 登录成功，清除记忆，下次登录需重新领码
+      // 登录成功，彻底清除记忆
       localStorage.removeItem('pending_email');
     } catch (err: any) {
       setError('验证码错误或已过期');
@@ -61,9 +63,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  // 手动返回：清除记忆并回到邮箱输入页
   const handleGoBack = () => {
-    localStorage.removeItem('pending_email');
+    localStorage.removeItem('pending_email'); // 用户主动点击返回，才清除记忆
     setStep('email');
     setToken('');
     setError(null);
@@ -100,7 +101,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <form onSubmit={handleVerifyCode} className="animate-in slide-in-from-right-4 duration-500 text-center">
           <p className="text-sm text-gray-500 mb-6 font-medium">验证码已发送至 <span className="text-[#111418] font-bold">{email}</span></p>
           
-          {/* 6格专业输入样式 */}
           <div className="relative w-full mb-10">
              <div className="flex justify-between gap-2">
                 {[...Array(6)].map((_, i) => (
@@ -124,14 +124,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {loading ? '校验中...' : '立即登录'}
           </button>
           
-          <button type="button" onClick={handleGoBack} className="mt-8 text-gray-400 font-bold text-sm hover:text-gray-600 transition-colors">
+          <button type="button" onClick={handleGoBack} className="mt-8 text-gray-400 font-bold text-sm">
             返回修改邮箱
           </button>
         </form>
       )}
 
       {error && (
-        <div className="mt-8 p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100 text-center animate-pulse">
+        <div className="mt-8 p-4 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 text-center">
           {error}
         </div>
       )}
