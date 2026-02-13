@@ -7,7 +7,7 @@ const Mine: React.FC = () => {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser(); // 获取当前人信息
+      const { data: { user } } = await supabase.auth.getUser(); 
       if (user) setUserEmail(user.email || null);
     };
     getUser();
@@ -15,9 +15,16 @@ const Mine: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      // 1. 退出 Supabase 状态
+      // 1. 在退出前，先把当前邮箱存入待验证记忆
+      // 这样退出后刷新页面，Login.tsx 就会直接显示 6 格界面
+      if (userEmail) {
+        localStorage.setItem('pending_email', userEmail);
+      }
+      
+      // 2. 退出登录
       await supabase.auth.signOut(); 
-      // 2. 刷新页面。此时 Login.tsx 会检查 localStorage，发现 pending_email 还在，所以会停留在 6 格输入页
+      
+      // 3. 刷新页面回到登录页
       window.location.reload(); 
     } catch (err) {
       console.error(err);
@@ -40,8 +47,8 @@ const Mine: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 px-4 space-y-3">
-        <div className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm active:bg-gray-50 transition-colors">
+      <div className="flex-1 px-4">
+        <div className="bg-white rounded-2xl p-4 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-gray-400">history</span>
             <span className="text-[#111418] font-bold text-sm">我的上报记录</span>
@@ -56,7 +63,7 @@ const Mine: React.FC = () => {
           className="w-full h-14 bg-white text-[#FF4D4F] font-black rounded-2xl border border-red-50 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-xl">logout</span>
-          退出当前账号
+          退出并重新验证
         </button>
       </div>
     </div>
