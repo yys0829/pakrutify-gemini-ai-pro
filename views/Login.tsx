@@ -32,23 +32,46 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  // 第二步：验证验证码
+  // 第二步：验证验证码（完整严密版）
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setLoading(true); // 1. 开始显示“校验中”
     setError(null);
+    
     try {
+      console.log("正在尝试验证邮箱:", email, "验证码:", token);
+
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'email'
+        type: 'email' // 注意：建议这里先统一改为 'email'，它的兼容性最强
       });
-      if (verifyError) throw verifyError;
-      // 登录成功后的逻辑会被 App.tsx 的 onAuthStateChange 自动接管
+
+      if (verifyError) {
+        // 如果 Supabase 返回了明确的错误（如验证码错、已过期）
+        throw verifyError;
+      }
+
+      // 如果走到这里，说明验证成功了
+      console.log("验证成功！", data);
+      
+      // 注意：如果登录成功后页面没跳，可能是 App.tsx 还没反应过来
+      // 这里不需要写 setLoading(false)，因为页面即将跳转/刷新
+
     } catch (err: any) {
-      setError('验证码错误或已过期');
-    } finally {
-      setLoading(false);
+      // 2. 关键点：无论发生什么错误，都要把“校验中”停下来
+      console.error("验证过程发生错误:", err);
+      
+      // 将具体的错误信息显示给用户
+      if (err.message === 'User not found') {
+        setError('该账号未激活或不在名单内');
+      } else if (err.status === 401 || err.status === 403) {
+        setError('验证码错误或已失效，请重新获取');
+      } else {
+        setError(err.message || '网络连接超时，请检查手机网络');
+      }
+
+      setLoading(false); // 3. 必须重置状态，让按钮恢复点击
     }
   };
 
