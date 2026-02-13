@@ -7,6 +7,22 @@ const Report: React.FC = () => {
 
   // 选择照片或拍照
   const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ... 前面代码不变
+  
+  console.log("准备上传文件:", file.name); //
+
+  const { data, error: uploadError } = await supabase.storage
+    .from('hazards')
+    .upload(filePath, file);
+
+  if (uploadError) {
+    console.error("上传报错详情:", uploadError); // 如果这里报错，就能看到原因
+    throw uploadError;
+  }
+
+  console.log("上传成功，返回数据:", data); //
+  alert('照片上传成功！');
+};
     try {
       setUploading(true);
       if (!e.target.files || e.target.files.length === 0) return;
