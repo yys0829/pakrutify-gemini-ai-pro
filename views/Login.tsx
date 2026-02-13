@@ -8,35 +8,45 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
+  const [token, setToken] = useState(''); // 存放6位验证码
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [step, setStep] = useState<'email' | 'code'>('email'); // 步骤控制
   const [error, setError] = useState<string | null>(null);
 
-  const handleMagicLinkLogin = async (e: React.FormEvent) => {
+  // 第一步：发送验证码邮件
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    if (!email) {
-      setError('请输入您的邮箱地址');
-      return;
-    }
-
     setLoading(true);
+    setError(null);
     try {
-      // --- 关键修改区开始 ---
       const { error: authError } = await supabase.auth.signInWithOtp({
         email: email,
-        options: {
-          // 这里是精髓：window.location.origin 会自动抓取你当前的网址
-          // 确保用户点开邮件链接后，能准确跳回你现在的 Vercel 网站首页
-          emailRedirectTo: window.location.origin, 
-        },
+        options: { shouldCreateUser: false } // 只允许名单内的人登录
       });
-      // --- 关键修改区结束 ---
-
       if (authError) throw authError;
-      setSent(true);
+      setStep('code'); // 进入验证码输入环节
     } catch (err: any) {
-      setError('发送失败：' + (err.message || '请检查邮箱格式'));
+      setError(err.message === 'User not found' ? '该邮箱不在名单内' : '发送失败，请稍后再试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 第二步：验证验证码
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'magiclink'
+      });
+      if (verifyError) throw verifyError;
+      // 登录成功后的逻辑会被 App.tsx 的 onAuthStateChange 自动接管
+    } catch (err: any) {
+      setError('验证码错误或已过期');
     } finally {
       setLoading(false);
     }
@@ -46,74 +56,51 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     <div className="flex flex-col h-full bg-white px-8 pt-8 max-w-[480px] mx-auto overflow-y-auto no-scrollbar">
       <div className="mb-8 text-center shrink-0">
         <div className="size-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-          <span className="material-symbols-outlined text-primary text-5xl">security</span>
+          <span className="material-symbols-outlined text-primary text-5xl">verified_user</span>
         </div>
-        <h1 className="text-xl font-extrabold text-[#111418] tracking-tight">中色国矿帕鲁特公司安全管理平台</h1>
-        <p className="text-sm text-gray-500 mt-2 font-medium italic">Pakrut SafetyGuard Platform</p>
+        <h1 className="text-xl font-extrabold text-[#111418]">安全管理平台</h1>
+        <p className="text-sm text-gray-500 mt-2">{step === 'email' ? '邮箱验证登录' : '已向您的邮箱发送验证码'}</p>
       </div>
 
-      {!sent ? (
-        <form onSubmit={handleMagicLinkLogin} className="space-y-6 shrink-0 pb-10">
-          <div className="bg-blue-50 p-4 rounded-xl mb-4">
-            <p className="text-xs text-blue-700 leading-relaxed text-center">
-              请输入备案邮箱，我们将发送登录链接至您的邮箱。
-            </p>
-          </div>
-
+      {step === 'email' ? (
+        <form onSubmit={handleSendCode} className="space-y-6">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">企业/个人邮箱</label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">mail</span>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                className={`w-full h-14 pl-12 pr-4 rounded-xl border bg-gray-50 focus:bg-white transition-all outline-none text-sm ${error ? 'border-red-500' : 'border-gray-200'}`}
-                placeholder="example@pakrut.com"
-                required
-              />
-            </div>
-            {error && <p className="text-[11px] text-red-500 font-bold mt-1.5 ml-1 animate-pulse">{error}</p>}
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">企业邮箱</label>
+            <input 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-14 px-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none"
+              placeholder="example@pakrut.com"
+              required
+            />
           </div>
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-6"
-          >
-            {loading ? (
-              <span className="material-symbols-outlined animate-spin">sync</span>
-            ) : (
-              '获取登录链接'
-            )}
+          <button type="submit" disabled={loading} className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg">
+            {loading ? '发送中...' : '获取验证码'}
           </button>
         </form>
       ) : (
-        <div className="text-center py-10 space-y-6">
-          <div className="size-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
-            <span className="material-symbols-outlined text-4xl">check_circle</span>
+        <form onSubmit={handleVerifyCode} className="space-y-6">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">6位验证码</label>
+            <input 
+              type="text" 
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              className="w-full h-14 px-4 text-center text-2xl tracking-[1em] font-bold rounded-xl border border-gray-200 bg-gray-50 focus:bg-white outline-none"
+              placeholder="000000"
+              maxLength={6}
+              required
+            />
           </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-bold text-gray-800">邮件已发送</h2>
-            <p className="text-sm text-gray-500 px-4">
-              链接已发送至 <b>{email}</b>，请查看收件箱并点击链接。
-            </p>
-          </div>
-          <button 
-            onClick={() => setSent(false)}
-            className="text-primary text-sm font-bold hover:underline"
-          >
-            返回修改邮箱
+          <button type="submit" disabled={loading} className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg">
+            {loading ? '校验中...' : '立即登录'}
           </button>
-        </div>
+          <button type="button" onClick={() => setStep('email')} className="w-full text-sm text-gray-400 font-bold">返回修改邮箱</button>
+        </form>
       )}
 
-      <div className="mt-auto py-8 text-center shrink-0">
-        <p className="text-[10px] text-gray-400 leading-relaxed">
-          管理人员请使用备案邮箱登录<br/>
-          © 2026 Pakrut Gold Mine Safety Dept.
-        </p>
-      </div>
+      {error && <p className="text-center text-red-500 text-xs mt-4 font-bold">{error}</p>}
     </div>
   );
 };
