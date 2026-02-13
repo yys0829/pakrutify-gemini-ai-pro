@@ -41,7 +41,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'magiclink'
+        type: 'email'
       });
       if (verifyError) throw verifyError;
       // 登录成功后的逻辑会被 App.tsx 的 onAuthStateChange 自动接管
