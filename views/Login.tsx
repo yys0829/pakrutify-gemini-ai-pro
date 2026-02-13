@@ -1,45 +1,38 @@
 
 import React, { useState } from 'react';
-import { supabase } from '../services/reportService'; // 确保路径正确
+import { supabase } from '../services/reportService'; 
 
 interface LoginProps {
-  // 登录成功后的回调，现在数据从数据库获取
-  onLogin: (data: { name: string; role: string; email: string }) => void;
+  onLogin: (data: { name: string; unitLabel: string; role: any; roleName: string }) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false); // 邮件是否发送成功
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleMagicLinkLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
     if (!email) {
-      setError('请输入您的企业邮箱');
+      setError('请输入您的邮箱地址');
       return;
     }
 
     setLoading(true);
-
     try {
-      // 1. 调用 Supabase 发送魔术链接
       const { error: authError } = await supabase.auth.signInWithOtp({
         email: email,
         options: {
-          // 登录后跳回当前页面
           emailRedirectTo: window.location.origin,
         },
       });
 
       if (authError) throw authError;
-
-      // 2. 显示发送成功界面
       setSent(true);
     } catch (err: any) {
-      setError(err.message || '邮件发送失败，请检查邮箱地址');
+      setError('发送失败：' + (err.message || '请检查邮箱格式'));
     } finally {
       setLoading(false);
     }
@@ -47,22 +40,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="flex flex-col h-full bg-white px-8 pt-8 max-w-[480px] mx-auto overflow-y-auto no-scrollbar">
-      {/* 头部 Logo 区域 */}
       <div className="mb-8 text-center shrink-0">
         <div className="size-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-          <span className="material-symbols-outlined text-primary text-5xl">mark_email_read</span>
+          <span className="material-symbols-outlined text-primary text-5xl">security</span>
         </div>
         <h1 className="text-xl font-extrabold text-[#111418] tracking-tight">中色国矿帕鲁特公司安全管理平台</h1>
         <p className="text-sm text-gray-500 mt-2 font-medium italic">Pakrut SafetyGuard Platform</p>
       </div>
 
       {!sent ? (
-        /* 第一阶段：输入邮箱 */
         <form onSubmit={handleMagicLinkLogin} className="space-y-6 shrink-0 pb-10">
           <div className="bg-blue-50 p-4 rounded-xl mb-4">
-            <p className="text-xs text-blue-700 leading-relaxed">
-              <strong>无密码登录说明：</strong><br/>
-              请输入您在系统备案的邮箱，点击下方按钮。我们将发送一封“魔术链接”邮件到您的邮箱，点击链接即可直接进入平台。
+            <p className="text-xs text-blue-700 leading-relaxed text-center">
+              请输入备案邮箱，我们将发送登录链接至您的邮箱。
             </p>
           </div>
 
@@ -74,12 +64,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 type="email" 
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                className={`w-full h-14 pl-12 pr-4 rounded-xl border bg-gray-50 focus:bg-white transition-all outline-none text-sm ${error ? 'border-danger focus:ring-danger/10' : 'border-gray-200 focus:ring-primary/20 focus:border-primary'}`}
+                className={`w-full h-14 pl-12 pr-4 rounded-xl border bg-gray-50 focus:bg-white transition-all outline-none text-sm ${error ? 'border-red-500' : 'border-gray-200'}`}
                 placeholder="example@pakrut.com"
                 required
               />
             </div>
-            {error && <p className="text-[11px] text-danger font-bold mt-1.5 ml-1 animate-pulse">{error}</p>}
+            {error && <p className="text-[11px] text-red-500 font-bold mt-1.5 ml-1 animate-pulse">{error}</p>}
           </div>
 
           <button 
@@ -90,39 +80,33 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             {loading ? (
               <span className="material-symbols-outlined animate-spin">sync</span>
             ) : (
-              <>
-                <span>获取登录链接</span>
-                <span className="material-symbols-outlined text-xl">send</span>
-              </>
+              '获取登录链接'
             )}
           </button>
         </form>
       ) : (
-        /* 第二阶段：提示去查收 */
-        <div className="text-center py-10 space-y-6 animate-in fade-in zoom-in duration-300">
+        <div className="text-center py-10 space-y-6">
           <div className="size-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
-            <span className="material-symbols-outlined text-4xl">outgoing_mail</span>
+            <span className="material-symbols-outlined text-4xl">check_circle</span>
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-gray-800">邮件已发出</h2>
-            <p className="text-sm text-gray-500">
-              我们已向 <span className="font-bold text-gray-800">{email}</span> 发送了登录链接。<br/>
-              请检查收件箱（或垃圾箱），点击链接即可进入。
+            <h2 className="text-xl font-bold text-gray-800">邮件已发送</h2>
+            <p className="text-sm text-gray-500 px-4">
+              链接已发送至 <b>{email}</b>，请查看收件箱并点击链接。
             </p>
           </div>
           <button 
             onClick={() => setSent(false)}
             className="text-primary text-sm font-bold hover:underline"
           >
-            返回修改邮箱地址
+            返回修改邮箱
           </button>
         </div>
       )}
 
-      {/* 底部版权信息 */}
       <div className="mt-auto py-8 text-center shrink-0">
-        <p className="text-[10px] text-gray-400 leading-relaxed uppercase tracking-widest">
-          Secured by Supabase Auth<br/>
+        <p className="text-[10px] text-gray-400 leading-relaxed">
+          管理人员请使用备案邮箱登录<br/>
           © 2026 Pakrut Gold Mine Safety Dept.
         </p>
       </div>
