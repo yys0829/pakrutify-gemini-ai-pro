@@ -50,7 +50,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'email'
+        type:'email'
       });
       if (verifyError) throw verifyError;
       
