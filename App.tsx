@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { supabase } from './services/reportService'; // 确保路径指向你的 supabase 配置文件
 import Dashboard from './views/Dashboard';
 import HazardReport from './views/HazardReport';
 import ViolationReport from './views/ViolationReport';
@@ -20,60 +21,63 @@ const App: React.FC = () => {
   const [userInfo, setUserInfo] = useState<UserInfo>({
     name: '',
     unit: '',
-    role: 'WORKER',
+    role: 'WORKER', // 默认为普通工人
     roleName: ''
   });
-  const [rolePermissions, setRolePermissions] = useState<Record<UserRole, PermissionKey[]>>({
-    ADMIN: ['hazard', 'violation', 'hazard_feedback', 'report_list', 'quiz', 'analytics', 'regulations', 'backoffice', 'permissions'],
-    SAFETY_OFFICER: ['hazard', 'violation', 'hazard_feedback', 'report_list', 'quiz', 'analytics', 'regulations'],
-    WORKER: ['hazard', 'quiz', 'regulations', 'analytics']
-  });
 
-  // Load permissions from localStorage on mount
+  // 1. 定义三类人的核心权限映射 (对应你的 4/50/40 方案)
+  const rolePermissions: Record<string, PermissionKey[]> = {
+    super_admin: ['hazard', 'violation', 'hazard_feedback', 'report_list', 'quiz', 'analytics', 'regulations', 'backoffice', 'permissions'],
+    manager: ['hazard', 'violation', 'hazard_feedback', 'report_list', 'quiz', 'analytics', 'regulations'],
+    worker: ['hazard', 'quiz', 'regulations', 'analytics']
+  };
+
+  // 2. 核心：监听 Supabase 身份状态变化
   useEffect(() => {
-    const saved = localStorage.getItem('role_permissions');
-    if (saved) {
-      try {
-        setRolePermissions(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse permissions", e);
+    // 监听登录/登出/邮件链接跳转事件
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        // 当有会话时，去 profiles 表获取详细角色
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', session.user.email)
+          .single();
+
+        if (profile) {
+          setUserInfo({
+            name: profile.real_name || session.user.email?.split('@')[0] || '用户',
+            unit: profile.dept || '中色国矿',
+            role: (profile.role as UserRole) || 'WORKER',
+            roleName: profile.role === 'super_admin' ? '超级管理员' : (profile.role === 'manager' ? '安全管理人员' : '基层员工')
+          });
+          setIsLoggedIn(true);
+        }
+      } else {
+        setIsLoggedIn(false);
       }
-    }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  // 权限检查工具
   const hasPermission = (permission: PermissionKey): boolean => {
-    return rolePermissions[userInfo.role].includes(permission);
+    // 将数据库角色映射回我们的权限表
+    const permissions = rolePermissions[userInfo.role.toLowerCase()] || rolePermissions['worker'];
+    return permissions.includes(permission);
   };
 
-  const handleLogin = (data: { name: string; unitLabel: string; role: UserRole; roleName: string }) => {
-    setUserInfo({
-      name: data.name,
-      unit: data.unitLabel,
-      role: data.role,
-      roleName: data.roleName
-    });
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setIsLoggedIn(false);
-    setUserInfo({
-      name: '',
-      unit: '',
-      role: 'WORKER',
-      roleName: ''
-    });
     setCurrentView('dashboard');
   };
 
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard 
-          userInfo={userInfo}
-          hasPermission={hasPermission}
-          onNavigate={(view) => setCurrentView(view)} 
-        />;
+        return <Dashboard userInfo={userInfo} hasPermission={hasPermission} onNavigate={(view) => setCurrentView(view)} />;
       case 'hazard':
         return <HazardReport onBack={() => setCurrentView('dashboard')} />;
       case 'violation':
@@ -87,20 +91,14 @@ const App: React.FC = () => {
       case 'regulations':
         return <Regulations onBack={() => setCurrentView('dashboard')} />;
       case 'mine':
-        return <Mine 
-          userInfo={userInfo}
-          hasPermission={hasPermission}
-          onBack={() => setCurrentView('dashboard')} 
-          onNavigate={(view) => setCurrentView(view)}
-          onLogout={handleLogout}
-        />;
+        return <Mine userInfo={userInfo} hasPermission={hasPermission} onBack={() => setCurrentView('dashboard')} onNavigate={(view) => setCurrentView(view)} onLogout={handleLogout} />;
       case 'analytics':
         return <Analytics onBack={() => setCurrentView('dashboard')} />;
       case 'backoffice':
-        if (!hasPermission('backoffice')) return <div className="p-10 text-center text-gray-400">无权访问后台</div>;
+        if (!hasPermission('backoffice')) return <div className="p-10 text-center text-gray-400 font-bold">无权访问后台管理</div>;
         return <BackOffice onBack={() => setCurrentView('mine')} />;
       case 'permissions':
-        if (!hasPermission('permissions')) return <div className="p-10 text-center text-gray-400">无权设置权限</div>;
+        if (!hasPermission('permissions')) return <div className="p-10 text-center text-gray-400 font-bold">无权设置权限</div>;
         return <PermissionSettings onBack={() => setCurrentView('mine')} />;
       default:
         return <div className="p-10 text-center text-gray-400">视图未定义</div>;
@@ -116,7 +114,7 @@ const App: React.FC = () => {
       </div>
 
       {!isLoggedIn ? (
-        <Login onLogin={handleLogin} />
+        <Login onLogin={() => {}} /> /* Login组件现在内部处理Supabase登录，不需要传handleLogin了 */
       ) : (
         <div className="flex-1 flex flex-col overflow-hidden relative">
           <div className="flex-1 overflow-hidden flex flex-col">
@@ -125,53 +123,29 @@ const App: React.FC = () => {
           
           {showNav && (
             <nav className="shrink-0 bg-white border-t border-gray-200 px-6 py-2 pb-6 flex justify-between items-center z-50">
-              <button 
-                onClick={() => setCurrentView('dashboard')}
-                className={`flex flex-col items-center gap-1 ${currentView === 'dashboard' ? 'text-primary' : 'text-gray-400'}`}
-              >
+              <button onClick={() => setCurrentView('dashboard')} className={`flex flex-col items-center gap-1 ${currentView === 'dashboard' ? 'text-primary' : 'text-gray-400'}`}>
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: currentView === 'dashboard' ? "'FILL' 1" : "" }}>home</span>
                 <span className="text-[10px] font-bold">首页</span>
               </button>
               
-              <button 
-                onClick={() => {
-                  if (hasPermission('regulations')) setCurrentView('regulations');
-                  else alert('当前角色无此权限');
-                }}
-                className={`flex flex-col items-center gap-1 ${currentView === 'regulations' ? 'text-primary' : 'text-gray-400'}`}
-              >
+              <button onClick={() => hasPermission('regulations') ? setCurrentView('regulations') : alert('无此权限')} className={`flex flex-col items-center gap-1 ${currentView === 'regulations' ? 'text-primary' : 'text-gray-400'}`}>
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: currentView === 'regulations' ? "'FILL' 1" : "" }}>menu_book</span>
                 <span className="text-[10px] font-medium">制度库</span>
               </button>
               
               <div className="relative">
-                 <button 
-                  onClick={() => {
-                    if (hasPermission('hazard')) setCurrentView('hazard');
-                    else alert('当前角色无此权限');
-                  }}
-                  className="size-12 rounded-full bg-primary text-white flex items-center justify-center -mt-8 border-4 border-background-light shadow-lg transform active:scale-90 transition-transform"
-                >
+                 <button onClick={() => hasPermission('hazard') ? setCurrentView('hazard') : alert('无此权限')} className="size-12 rounded-full bg-primary text-white flex items-center justify-center -mt-8 border-4 border-background-light shadow-lg transform active:scale-90 transition-transform">
                   <span className="material-symbols-outlined">add</span>
                 </button>
                 <span className="text-[10px] font-medium text-gray-400 block text-center mt-1">快捷上报</span>
               </div>
               
-              <button 
-                onClick={() => {
-                  if (hasPermission('analytics')) setCurrentView('analytics');
-                  else alert('当前角色无此权限');
-                }}
-                className={`flex flex-col items-center gap-1 ${currentView === 'analytics' ? 'text-primary' : 'text-gray-400'}`}
-              >
+              <button onClick={() => hasPermission('analytics') ? setCurrentView('analytics') : alert('无此权限')} className={`flex flex-col items-center gap-1 ${currentView === 'analytics' ? 'text-primary' : 'text-gray-400'}`}>
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: currentView === 'analytics' ? "'FILL' 1" : "" }}>bar_chart</span>
                 <span className="text-[10px] font-medium">看板</span>
               </button>
               
-              <button 
-                onClick={() => setCurrentView('mine')}
-                className={`flex flex-col items-center gap-1 ${currentView === 'mine' ? 'text-primary' : 'text-gray-400'}`}
-              >
+              <button onClick={() => setCurrentView('mine')} className={`flex flex-col items-center gap-1 ${currentView === 'mine' ? 'text-primary' : 'text-gray-400'}`}>
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: currentView === 'mine' ? "'FILL' 1" : "" }}>person</span>
                 <span className="text-[10px] font-medium">我的</span>
               </button>
