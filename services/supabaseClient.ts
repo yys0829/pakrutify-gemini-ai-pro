@@ -3,12 +3,25 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
 
-// 增加一个统一的退出函数，给全应用调用
+// 强力退出：3秒内如果不成功，也强制清理本地并跳走
 export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) console.error('退出失败:', error.message);
-  // 退出后强行刷新页面，清空所有残留状态，回到登录页
-  window.location.href = '/login'; 
+  try {
+    await Promise.race([
+      supabase.auth.signOut(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+    ]);
+  } catch (e) {
+    console.warn('退出请求超时或失败，强制清理');
+  } finally {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = '/'; 
+  }
 };
