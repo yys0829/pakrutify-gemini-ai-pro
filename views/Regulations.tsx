@@ -1,187 +1,122 @@
 
-import React, { useState, useRef } from 'react';
-import { REGULATION_CATEGORIES } from '../constants';
-import { MainCategory, SubCategory, Regulation } from '../types';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../services/supabaseClient'; // 确认路径是否正确
 
-interface RegulationsProps {
-  onBack: () => void;
-}
+const SafetyLibrary = () => {
+  // 1. 状态管理：只认数据库里的真数据，彻底告别“刷新后原始文件又出现”
+  const [regulations, setRegulations] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
-const Regulations: React.FC<RegulationsProps> = ({ onBack }) => {
-  const [openMain, setOpenMain] = useState<string | null>('cnmc');
-  const [openSub, setOpenSub] = useState<string | null>(null);
-  const [categories, setCategories] = useState<MainCategory[]>(REGULATION_CATEGORIES);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeUploadTarget, setActiveUploadTarget] = useState<{ mainId: string, subId: string } | null>(null);
-
-  const handleUploadClick = (mainId: string, subId: string) => {
-    setActiveUploadTarget({ mainId, subId });
-    fileInputRef.current?.click();
+  // 2. 初始化：从数据库 safety_regulations 表读取数据
+  const fetchData = async () => {
+    const { data, error } = await supabase
+      .from('safety_regulations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error) {
+      setRegulations(data || []); // ⚠️ 这样就清空了代码里写死的旧文件
+    }
   };
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeUploadTarget) return;
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-    // Check file format
-    const allowedExtensions = ['.pdf', '.doc', '.docx'];
-    const fileName = file.name.toLowerCase();
-    const isAllowed = allowedExtensions.some(ext => fileName.endsWith(ext));
+  // 3. 上传功能：同时完成“进仓库”和“入账本”
+  const handleUpload = async (e, category) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    if (!isAllowed) {
-      alert('仅支持上传 PDF 或 Word (.doc, .docx) 格式的文件');
+    setUploading(true);
+    // 使用时间戳重命名，彻底解决中文名无法上传的问题
+    const fileName = `${Date.now()}_${file.name.replace(/[^a-z0-9.]/gi, '_')}`;
+    
+    // A. 上传到存储桶 (Storage)
+    const { error: storageError } = await supabase.storage
+      .from('regulations')
+      .upload(fileName, file);
+
+    if (storageError) {
+      alert("上传仓库失败: " + storageError.message);
+      setUploading(false);
       return;
     }
 
-    const newDoc: Regulation = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      size: (file.size / (1024 * 1024)).toFixed(2) + 'MB',
-      updatedAt: new Date().toISOString().split('T')[0],
-      downloaded: false
-    };
+    // B. 获取链接并存入数据库表 (Table)
+    const { data: { publicUrl } } = supabase.storage.from('regulations').getPublicUrl(fileName);
+    const { error: dbError } = await supabase.from('safety_regulations').insert([
+      { title: file.name, file_url: publicUrl, category: category }
+    ]);
 
-    setCategories(prev => prev.map(main => {
-      if (main.id === activeUploadTarget.mainId) {
-        return {
-          ...main,
-          subCategories: main.subCategories.map(sub => {
-            if (sub.id === activeUploadTarget.subId) {
-              return { ...sub, documents: [...sub.documents, newDoc] };
-            }
-            return sub;
-          })
-        };
-      }
-      return main;
-    }));
-
-    setActiveUploadTarget(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    alert('文件上传成功！');
+    if (dbError) {
+      alert("记录保存失败: " + dbError.message);
+    } else {
+      fetchData(); // 成功后刷新列表
+    }
+    setUploading(false);
   };
 
-  const handleDeleteDoc = (mainId: string, subId: string, docId: string) => {
-    if (!window.confirm('确定要删除该制度文件吗？')) return;
-
-    setCategories(prev => prev.map(main => {
-      if (main.id === mainId) {
-        return {
-          ...main,
-          subCategories: main.subCategories.map(sub => {
-            if (sub.id === subId) {
-              return { ...sub, documents: sub.documents.filter(d => d.id !== docId) };
-            }
-            return sub;
-          })
-        };
-      }
-      return main;
-    }));
+  // 4. 删除功能：从数据库彻底抹除，刷新也不会再出来
+  const handleDelete = async (id) => {
+    if (!window.confirm("确定要永久删除此制度文件吗？")) return;
+    const { error } = await supabase.from('safety_regulations').delete().eq('id', id);
+    if (!error) {
+      setRegulations(prev => prev.filter(item => item.id !== id));
+    } else {
+      alert("删除失败");
+    }
   };
+
+  const sections = [
+    { title: "国家安全环保法律法规", icon: "⚖️" },
+    { title: "集团公司安全环保制度", icon: "🌐" },
+    { title: "二级单位安全环保制度", icon: "🏢" },
+    { title: "三级单位安全环保制度", icon: "🏭" }
+  ];
 
   return (
-    <div className="flex flex-col h-screen bg-background-light overflow-hidden">
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shrink-0">
-        <div className="flex items-center p-4 justify-between">
-          <button onClick={onBack} className="text-primary flex size-10 items-center justify-center">
-            <span className="material-symbols-outlined">arrow_back_ios</span>
-          </button>
-          <h1 className="text-lg font-bold flex-1 text-center">安全环保制度库</h1>
-          <div className="size-10"></div>
-        </div>
-      </header>
-
-      <main className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-32">
-        {categories.map((main) => (
-          <div key={main.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <button 
-              onClick={() => setOpenMain(openMain === main.id ? null : main.id)}
-              className="w-full flex items-center justify-between p-4 active:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`size-10 rounded-xl flex items-center justify-center ${main.colorClass}`}>
-                  <span className="material-symbols-outlined">{main.icon}</span>
-                </div>
-                <span className="text-sm font-bold text-gray-800 text-left">{main.name}</span>
+    <div className="p-4 bg-gray-50 min-h-screen pb-20">
+      <h2 className="text-center font-bold text-xl text-blue-900 mb-6">安全环保制度库</h2>
+      
+      <div className="space-y-4">
+        {sections.map(section => (
+          <div key={section.title} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">{section.icon}</span>
+                <span className="font-bold text-gray-800">{section.title}</span>
               </div>
-              <span className={`material-symbols-outlined text-gray-300 transition-transform ${openMain === main.id ? 'rotate-180' : ''}`}>expand_more</span>
-            </button>
+              <label className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-medium cursor-pointer hover:bg-blue-100 transition-colors">
+                上传新文件
+                <input type="file" className="hidden" onChange={(e) => handleUpload(e, section.title)} />
+              </label>
+            </div>
 
-            {openMain === main.id && (
-              <div className="px-4 pb-4 space-y-2">
-                {main.subCategories.map((sub) => (
-                  <div key={sub.id} className="bg-gray-50 rounded-xl overflow-hidden">
-                    <div className="w-full flex items-center justify-between p-3">
-                      <button 
-                        onClick={() => setOpenSub(openSub === sub.id ? null : sub.id)}
-                        className="flex-1 text-left text-xs font-bold text-gray-600 flex items-center gap-2"
-                      >
-                        <span>{sub.name}</span>
-                        <span className="text-[10px] text-gray-400">({sub.documents.length} 份)</span>
-                      </button>
-                      <button 
-                        onClick={() => handleUploadClick(main.id, sub.id)}
-                        className="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center active:scale-95 transition-all"
-                        title="上传文件"
-                      >
-                        <span className="material-symbols-outlined text-sm">upload_file</span>
-                      </button>
-                    </div>
-                    
-                    {openSub === sub.id && (
-                      <div className="bg-white border-t border-gray-100 px-2 py-1">
-                        {sub.documents.length > 0 ? (
-                          sub.documents.map((doc) => {
-                            const isWord = doc.name.toLowerCase().endsWith('.doc') || doc.name.toLowerCase().endsWith('.docx');
-                            return (
-                              <div key={doc.id} className="flex items-center justify-between p-3 border-b border-gray-50 last:border-0 group">
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                  <span className={`material-symbols-outlined text-sm ${isWord ? 'text-blue-500' : 'text-danger'}`}>
-                                    {isWord ? 'description' : 'picture_as_pdf'}
-                                  </span>
-                                  <div className="flex flex-col overflow-hidden">
-                                    <span className="text-xs font-medium text-gray-800 truncate">{doc.name}</span>
-                                    <span className="text-[9px] text-gray-400">{doc.size} · {doc.updatedAt}</span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button 
-                                    onClick={() => handleDeleteDoc(main.id, sub.id, doc.id)}
-                                    className="size-7 text-gray-300 hover:text-danger transition-colors flex items-center justify-center"
-                                  >
-                                    <span className="material-symbols-outlined text-sm">delete</span>
-                                  </button>
-                                  <span className={`material-symbols-outlined text-sm ${doc.downloaded ? 'text-primary' : 'text-gray-300'}`}>
-                                    {doc.downloaded ? 'download_done' : 'cloud_download'}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div className="p-4 text-center text-[10px] text-gray-400">暂无相关文件，点击右上角上传。</div>
-                        )}
-                      </div>
-                    )}
+            {/* 渲染该分类下的真数据 */}
+            <div className="space-y-2">
+              {regulations.filter(r => r.category === section.title).map(item => (
+                <div key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg text-sm">
+                  <span className="text-gray-700 truncate mr-4">{item.title}</span>
+                  <div className="flex space-x-4 flex-shrink-0">
+                    <a href={item.file_url} target="_blank" className="text-blue-500 font-medium">查看</a>
+                    <button onClick={() => handleDelete(item.id)} className="text-red-400">删除</button>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+              {regulations.filter(r => r.category === section.title).length === 0 && (
+                <p className="text-center text-gray-400 text-xs py-2">暂无制度文件</p>
+              )}
+            </div>
           </div>
         ))}
-      </main>
-
-      {/* Hidden file input */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={onFileChange} 
-        className="hidden" 
-        accept=".pdf,.doc,.docx"
-      />
+      </div>
+      {uploading && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white px-6 py-4 rounded-lg shadow-xl font-bold text-blue-600">处理中，请稍候...</div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default Regulations;
+export default SafetyLibrary;
